@@ -31,7 +31,7 @@ def get_binance_ticker(symbol="BTCUSDT"):
         return None
 
 def get_order_book(symbol="BTCUSDT"):
-    """Отримання склянки ордерів (Order Book)"""
+    """Отримання склянки ордерів (Order Book) з лімітом для кращого вигляду"""
     url = f"https://api.binance.com/api/v3/depth?symbol={symbol}&limit=15"
     try:
         data = requests.get(url, timeout=5).json()
@@ -136,7 +136,7 @@ with tab1:
             st.number_input("Кількість", value=0.0, key="trade_qty", format="%.4f")
         
         st.divider()
-        st.markdown("### 📑 Склянка ордерів (Order Book)")
+        # НАЗВА РОЗДІЛУ ВИДАЛЕНА
         ob_col1, ob_col2 = st.columns(2)
         with ob_col1:
             st.caption("Покупці (Bids)")
@@ -155,20 +155,21 @@ with tab1:
         **Аналітика та медіа:**
         * [**CoinTelegraph**](https://cointelegraph.com/) — Провідне крипто-медіа.
         * [**CoinDesk**](https://www.coindesk.com/) — Новини та аналіз ринку.
-        * [**CryptoPanic**](https://cryptopanic.com/) — Агрегатор новин у реальному часі.
+        * [**Decrypt**](https://decrypt.co/) — Свіжі новини про Web3 та DeFi.
         
         **Технічні інструменти:**
         * [**TradingView**](https://www.tradingview.com/) — Графіки та індикатори.
-        * [**Glassnode**](https://glassnode.com/) — On-chain аналітика.
-        * [**Whale Alert**](https://twitter.com/whale_alert) — Відстеження транзакцій китів.
+        * [**Glassnode**](https://glassnode.com/) — Професійна On-chain аналітика.
+        * [**CryptoPanic**](https://cryptopanic.com/) — Агрегатор новин у реальному часі.
         
         **Ринкові дані:**
         * [**CoinMarketCap**](https://coinmarketcap.com/) — Капіталізація монет.
         * [**CoinGecko**](https://www.coingecko.com/) — Трекер цін.
+        * [**DEXTools**](https://www.dextools.io/) — Аналіз токенів на DEX.
         """)
 
         st.divider()
-        st.subheader("🕒 Останні угоди")
+        # НАЗВА РОЗДІЛУ ВИДАЛЕНА
         trades_placeholder = st.empty()
 
 # Вкладка 2: Технічний аналіз
@@ -235,7 +236,7 @@ try:
         if data and 'lastPrice' in data:
             current_price = float(data['lastPrice'])
             
-            # 1. Оновлення калькулятора
+            # 1. Оновлення калькулятора в сайдбарі
             potential_coins = (usd_amount * lever) / current_price
             calc_placeholder.write(f"Орієнтовний об'єм: **{potential_coins:.5f} {symbol[:-4]}**")
 
@@ -243,7 +244,7 @@ try:
             with metrics_placeholder.container():
                 m1, m2, m3, m4 = st.columns(4)
                 m1.metric("Ціна", f"${current_price:,.2f}", f"{data['priceChangePercent']}%")
-                m2.metric("Об'єм 24г", f"{float(data['volume']):,.0f}")
+                m2.metric("Об'єм 24г", f"{float(data['volume']):,.0f} {symbol[:-4]}")
                 m3.metric("Макс 24г", f"${float(data['highPrice']):,.2f}")
                 m4.metric("Мін 24г", f"${float(data['lowPrice']):,.2f}")
 
@@ -267,14 +268,14 @@ try:
             fig.update_layout(height=350, margin=dict(l=0, r=0, t=10, b=10), template="plotly_dark")
             chart_placeholder.plotly_chart(fig, use_container_width=True, key=f"chart_{symbol}_{time.time()}")
 
-            # 4. Оновлення склянки ордерів (Order Book) з барами об'єму
+            # 4. Оновлення склянки ордерів з градієнтом та барами об'єму
             if bids is not None and asks is not None:
                 bids_style = bids.style.format(precision=2).bar(subset=['Quantity'], color='#005522').background_gradient(cmap='Greens', subset=['Price'])
                 asks_style = asks.style.format(precision=2).bar(subset=['Quantity'], color='#550022').background_gradient(cmap='Reds', subset=['Price'])
-                bids_placeholder.dataframe(bids_style, use_container_width=True, height=350)
-                asks_placeholder.dataframe(asks_style, use_container_width=True, height=350)
+                bids_placeholder.dataframe(bids_style, use_container_width=True, height=400)
+                asks_placeholder.dataframe(asks_style, use_container_width=True, height=400)
 
-            # 5. Оновлення останніх угод з кольоровим Side
+            # 5. Оновлення останніх угод (Recent Trades) з кольоровим Side
             if recent_trades is not None:
                 def color_side(val):
                     color = '#00ff00' if val == "BUY" else '#ff0000'
@@ -282,7 +283,7 @@ try:
                 
                 trades_placeholder.dataframe(
                     recent_trades.style.applymap(color_side, subset=['Side']).format(precision=4),
-                    use_container_width=True, height=350, hide_index=True
+                    use_container_width=True, height=400, hide_index=True
                 )
 
             # 6. Оновлення новин
@@ -290,6 +291,7 @@ try:
                 news_list = get_crypto_news()
                 for item in news_list[:4]:
                     st.markdown(f"**[{item['title']}]({item['url']})**")
+                    st.caption(f"Джерело: {item['source']} | {datetime.fromtimestamp(item['published_on']).strftime('%H:%M')}")
                     st.divider()
 
         time.sleep(update_speed)
