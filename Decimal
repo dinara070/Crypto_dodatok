@@ -1,0 +1,24 @@
+-- Користувачі та баланси
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL
+);
+
+CREATE TABLE wallets (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    currency VARCHAR(10) NOT NULL, -- Наприклад, 'BTC', 'USDT'
+    balance DECIMAL(36, 18) DEFAULT 0
+);
+
+-- Торгові ордери
+CREATE TABLE orders (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    symbol VARCHAR(20) NOT NULL,    -- Наприклад, 'BTCUSDT'
+    side VARCHAR(4) NOT NULL,      -- 'BUY' або 'SELL'
+    price DECIMAL(36, 18),
+    amount DECIMAL(36, 18),
+    status VARCHAR(20) DEFAULT 'OPEN' -- 'OPEN', 'FILLED', 'CANCELLED'
+);
