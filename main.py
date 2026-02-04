@@ -13,6 +13,7 @@ st.set_page_config(page_title="Crypto Portal Pro", layout="wide", page_icon="�
 
 @st.cache_data(ttl=60)
 def get_crypto_news():
+    """Отримання свіжих новин криптовалют"""
     url = "https://min-api.cryptocompare.com/data/v2/news/?lang=EN"
     try:
         response = requests.get(url, timeout=5)
@@ -21,6 +22,7 @@ def get_crypto_news():
         return []
 
 def get_binance_ticker(symbol="BTCUSDT"):
+    """Отримання поточної ціни та статистики з Binance"""
     url = f"https://api.binance.com/api/v3/ticker/24hr?symbol={symbol}"
     try:
         res = requests.get(url, timeout=5)
@@ -29,6 +31,7 @@ def get_binance_ticker(symbol="BTCUSDT"):
         return None
 
 def get_order_book(symbol="BTCUSDT"):
+    """Отримання склянки ордерів (Order Book)"""
     url = f"https://api.binance.com/api/v3/depth?symbol={symbol}&limit=10"
     try:
         data = requests.get(url, timeout=5).json()
@@ -39,6 +42,7 @@ def get_order_book(symbol="BTCUSDT"):
         return None, None
 
 def get_recent_trades(symbol="BTCUSDT"):
+    """Отримання останніх публічних угод (Recent Trades)"""
     url = f"https://api.binance.com/api/v3/trades?symbol={symbol}&limit=15"
     try:
         data = requests.get(url, timeout=5).json()
@@ -51,6 +55,7 @@ def get_recent_trades(symbol="BTCUSDT"):
         return None
 
 def get_fear_greed_index():
+    """Отримання індексу страху та жадібності"""
     try:
         res = requests.get("https://api.alternative.me/fng/", timeout=5).json()
         return res['data'][0]['value'], res['data'][0]['value_classification']
@@ -94,7 +99,7 @@ risk_profile = st.sidebar.select_slider(
     options=["Консервативний", "Помірний", "Агресивний"]
 )
 if risk_profile == "Агресивний":
-    st.sidebar.warning("Будьте обережні з великим плечем!")
+    st.sidebar.warning("🚨 Будьте обережні з великим плечем!")
 
 st.sidebar.divider()
 st.sidebar.subheader("🔗 Швидкі посилання")
@@ -107,8 +112,10 @@ st.sidebar.markdown("""
 # --- ОСНОВНИЙ ІНТЕРФЕЙС ---
 st.title("🚀 Crypto Intelligence & Trading Portal")
 
+# Створення вкладок
 tab1, tab2, tab3 = st.tabs(["📈 Торгівля", "🔍 Технічний аналіз", "🐋 Whale Alert"])
 
+# Вкладка 1: Торгівля
 with tab1:
     col_main, col_side = st.columns([2, 1])
 
@@ -117,6 +124,7 @@ with tab1:
         st.markdown("### 📊 Живий графік")
         chart_placeholder = st.empty()
         
+        # --- ФОРМА ТОРГІВЛІ (Simulation) ---
         st.markdown("### ⚡ Швидка торгівля (Simulation)")
         t_col1, t_col2 = st.columns(2)
         with t_col1:
@@ -129,8 +137,12 @@ with tab1:
         st.divider()
         st.markdown("### 📑 Склянка ордерів (Order Book)")
         ob_col1, ob_col2 = st.columns(2)
-        bids_placeholder = ob_col1.empty()
-        asks_placeholder = ob_col2.empty()
+        with ob_col1:
+            st.caption("Покупці (Bids)")
+            bids_placeholder = st.empty()
+        with ob_col2:
+            st.caption("Продавці (Asks)")
+            asks_placeholder = st.empty()
 
     with col_side:
         st.subheader("📰 Новини")
@@ -139,29 +151,52 @@ with tab1:
         st.subheader("🕒 Останні угоди")
         trades_placeholder = st.empty()
 
+# Вкладка 2: Технічний аналіз
 with tab2:
     st.subheader("🛠️ Професійний аналіз (TradingView)")
     tv_chart_html = f"""
-    <div style="height:600px;"><script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-    <script type="text/javascript">new TradingView.widget({{"width": "100%", "height": 600, "symbol": "BINANCE:{symbol}",
-    "interval": "D", "timezone": "Etc/UTC", "theme": "dark", "style": "1", "locale": "uk", "container_id": "tv_chart"}});
-    </script><div id="tv_chart"></div></div>
+    <div class="tradingview-widget-container" style="height:600px;">
+      <div id="tradingview_chart"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+      <script type="text/javascript">
+      new TradingView.widget({{
+        "width": "100%",
+        "height": 600,
+        "symbol": "BINANCE:{symbol}",
+        "interval": "D",
+        "timezone": "Etc/UTC",
+        "theme": "dark",
+        "style": "1",
+        "locale": "uk",
+        "toolbar_bg": "#f1f3f6",
+        "enable_publishing": false,
+        "allow_symbol_change": true,
+        "container_id": "tradingview_chart"
+      }});
+      </script>
+    </div>
     """
     components.html(tv_chart_html, height=610)
 
+# Вкладка 3: Whale Alert
 with tab3:
     st.subheader("🐋 Відстеження великих транзакцій")
+    st.info("Моніторинг переказів китів понад $1,000,000")
     whale_data = pd.DataFrame({
         'Час': [datetime.now().strftime("%H:%M:%S")],
-        'Актив': [symbol[:-4]], 'Сума': ["$4,150,000"],
-        'Джерело': ["Unknown Wallet"], 'Призначення': ["Binance"], 'Тип': ["🚨 Вливання"]
+        'Актив': [symbol[:-4]],
+        'Сума': ["$4,150,000"],
+        'Джерело': ["Unknown Wallet"],
+        'Призначення': ["Binance Exchange"],
+        'Тип': ["🚨 Вливання"]
     })
     st.table(whale_data)
 
-# --- ЛОГІКА ОНОВЛЕННЯ ---
+# --- ЛОГІКА ОНОВЛЕННЯ ДАНИХ ---
 
 if 'current_symbol' not in st.session_state or st.session_state.current_symbol != symbol:
-    st.session_state.price_history, st.session_state.time_history = [], []
+    st.session_state.price_history = []
+    st.session_state.time_history = []
     st.session_state.current_symbol = symbol
 
 try:
@@ -178,42 +213,61 @@ try:
                     st.write(f"**{coin}**: ${float(c_data['lastPrice']):,.2f} ({c_data['priceChangePercent']}%)")
 
         if data and 'lastPrice' in data:
-            price = float(data['lastPrice'])
-            calc_placeholder.write(f"Орієнтовний об'єм: **{(usd_amount * lever) / price:.5f} {symbol[:-4]}**")
+            current_price = float(data['lastPrice'])
+            
+            # 1. Оновлення калькулятора в сайдбарі
+            potential_coins = (usd_amount * lever) / current_price
+            calc_placeholder.write(f"Орієнтовний об'єм: **{potential_coins:.5f} {symbol[:-4]}**")
 
+            # 2. Оновлення верхніх метрик
             with metrics_placeholder.container():
                 m1, m2, m3, m4 = st.columns(4)
-                m1.metric("Ціна", f"${price:,.2f}", f"{data['priceChangePercent']}%")
+                m1.metric("Ціна", f"${current_price:,.2f}", f"{data['priceChangePercent']}%")
                 m2.metric("Об'єм 24г", f"{float(data['volume']):,.0f} {symbol[:-4]}")
                 m3.metric("Макс 24г", f"${float(data['highPrice']):,.2f}")
                 m4.metric("Мін 24г", f"${float(data['lowPrice']):,.2f}")
 
-            st.session_state.price_history.append(price)
+            # 3. Оновлення Plotly графіка
+            st.session_state.price_history.append(current_price)
             st.session_state.time_history.append(datetime.now())
             if len(st.session_state.price_history) > 30:
                 st.session_state.price_history.pop(0)
                 st.session_state.time_history.pop(0)
 
-            # Налаштування графіка згідно з вибором у Sidebar
             fig = go.Figure()
-            fill_mode = 'tozeroy' if chart_type == "З областями" else None
-            fig.add_trace(go.Scatter(x=st.session_state.time_history, y=st.session_state.price_history, 
-                                     mode='lines+markers', line=dict(color='#00FFCC'), fill=fill_mode))
+            # Налаштування типу графіка з сайдбару
+            fill_type = 'tozeroy' if chart_type == "З областями" else None
+            
+            fig.add_trace(go.Scatter(
+                x=st.session_state.time_history, 
+                y=st.session_state.price_history, 
+                mode='lines+markers', 
+                line=dict(color='#00FFCC', width=2),
+                fill=fill_type
+            ))
             fig.update_layout(height=350, margin=dict(l=0, r=0, t=10, b=10), template="plotly_dark")
-            chart_placeholder.plotly_chart(fig, use_container_width=True, key=f"c_{symbol}_{time.time()}")
+            chart_placeholder.plotly_chart(fig, use_container_width=True, key=f"chart_{symbol}_{time.time()}")
 
-            if bids is not None:
-                bids_placeholder.dataframe(bids.style.format(precision=2).background_gradient(cmap='Greens', subset=['Quantity']), use_container_width=True)
-                asks_placeholder.dataframe(asks.style.format(precision=2).background_gradient(cmap='Reds', subset=['Quantity']), use_container_width=True)
+            # 4. Оновлення склянки ордерів
+            if bids is not None and asks is not None:
+                bids_style = bids.style.format(precision=2).background_gradient(cmap='Greens', subset=['Quantity'])
+                asks_style = asks.style.format(precision=2).background_gradient(cmap='Reds', subset=['Quantity'])
+                bids_placeholder.dataframe(bids_style, use_container_width=True, height=250)
+                asks_placeholder.dataframe(asks_style, use_container_width=True, height=250)
 
+            # 5. Оновлення останніх угод
             if recent_trades is not None:
                 trades_placeholder.dataframe(recent_trades, use_container_width=True, height=300, hide_index=True)
 
+            # 6. Оновлення новин
             with news_placeholder.container():
-                for item in get_crypto_news()[:4]:
+                news_list = get_crypto_news()
+                for item in news_list[:4]:
                     st.markdown(f"**[{item['title']}]({item['url']})**")
+                    st.caption(f"Джерело: {item['source']} | {datetime.fromtimestamp(item['published_on']).strftime('%H:%M')}")
                     st.divider()
 
         time.sleep(update_speed)
+
 except Exception as e:
-    st.error(f"Помилка: {e}")
+    st.error(f"Виникла системна помилка: {e}")
