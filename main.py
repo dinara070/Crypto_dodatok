@@ -31,7 +31,7 @@ def get_binance_ticker(symbol="BTCUSDT"):
         return None
 
 def get_order_book(symbol="BTCUSDT"):
-    """Отримання склянки ордерів"""
+    """Отримання склянки ордерів (Order Book)"""
     url = f"https://api.binance.com/api/v3/depth?symbol={symbol}&limit=10"
     try:
         data = requests.get(url, timeout=5).json()
@@ -40,6 +40,19 @@ def get_order_book(symbol="BTCUSDT"):
         return bids, asks
     except Exception:
         return None, None
+
+def get_recent_trades(symbol="BTCUSDT"):
+    """Отримання останніх публічних угод (Recent Trades)"""
+    url = f"https://api.binance.com/api/v3/trades?symbol={symbol}&limit=15"
+    try:
+        data = requests.get(url, timeout=5).json()
+        df = pd.DataFrame(data)
+        df['time'] = pd.to_datetime(df['time'], unit='ms').dt.strftime('%H:%M:%S')
+        df['price'] = df['price'].astype(float)
+        df['qty'] = df['qty'].astype(float)
+        return df[['time', 'price', 'qty']]
+    except Exception:
+        return None
 
 def get_fear_greed_index():
     """Отримання індексу страху та жадібності"""
@@ -75,11 +88,12 @@ st.sidebar.markdown("""
 # --- ОСНОВНИЙ ІНТЕРФЕЙС ---
 st.title("🚀 Crypto Intelligence & Trading Portal")
 
-# Створення вкладок для організації контенту
+# Створення вкладок
 tab1, tab2, tab3 = st.tabs(["📈 Торгівля", "🔍 Технічний аналіз", "🐋 Whale Alert"])
 
+# Вкладка 1: Торгівля
 with tab1:
-    col_main, col_news = st.columns([3, 1])
+    col_main, col_side = st.columns([2, 1])
 
     with col_main:
         # Контейнер для швидких метрик (Ціна, Об'єм і т.д.)
@@ -88,32 +102,38 @@ with tab1:
         st.markdown("### 📊 Живий графік")
         chart_placeholder = st.empty()
         
+        # --- ФОРМА ТОРГІВЛІ (Simulation) ---
+        st.markdown("### ⚡ Швидка торгівля (Simulation)")
+        t_col1, t_col2 = st.columns(2)
+        with t_col1:
+            st.button(f"КУПИТИ {symbol[:-4]}", use_container_width=True, type="primary")
+            st.number_input("Ціна входу", value=0.0, key="buy_price", format="%.4f")
+        with t_col2:
+            st.button(f"ПРОДАТИ {symbol[:-4]}", use_container_width=True)
+            st.number_input("Кількість", value=0.0, key="trade_qty", format="%.4f")
+        
+        st.divider()
+        
         st.markdown("### 📑 Склянка ордерів (Order Book)")
-        col_bids, col_asks = st.columns(2)
-        with col_bids:
+        ob_col1, ob_col2 = st.columns(2)
+        with ob_col1:
             st.caption("Покупці (Bids)")
             bids_placeholder = st.empty()
-        with col_asks:
+        with ob_col2:
             st.caption("Продавці (Asks)")
             asks_placeholder = st.empty()
 
-    with col_news:
-        st.subheader("📰 Останні новини")
+    with col_side:
+        st.subheader("📰 Новини")
         news_placeholder = st.empty()
         
         st.divider()
-        st.subheader("🔗 Офіційні канали")
-        st.markdown("""
-        * [**CoinDesk**](https://www.coindesk.com/) — Новини та аналіз.
-        * [**CoinTelegraph**](https://cointelegraph.com/) — Крипто-медіа.
-        * [**CryptoPanic**](https://cryptopanic.com/) — Агрегатор новин.
-        * [**Glassnode**](https://studio.glassnode.com/) — On-chain дані.
-        * [**Binance Twitter**](https://twitter.com/binance) — Анонси.
-        """)
+        st.subheader("🕒 Останні угоди")
+        trades_placeholder = st.empty()
 
+# Вкладка 2: Технічний аналіз
 with tab2:
     st.subheader("🛠️ Професійний аналіз (TradingView)")
-    # Інтеграція професійного віджета TradingView
     tv_chart_html = f"""
     <div class="tradingview-widget-container" style="height:600px;">
       <div id="tradingview_chart"></div>
@@ -138,10 +158,10 @@ with tab2:
     """
     components.html(tv_chart_html, height=610)
 
+# Вкладка 3: Whale Alert
 with tab3:
     st.subheader("🐋 Відстеження великих транзакцій")
     st.info("Моніторинг переказів китів понад $1,000,000")
-    # Приклад таблиці активності китів
     whale_data = pd.DataFrame({
         'Час': [datetime.now().strftime("%H:%M:%S")],
         'Актив': [symbol[:-4]],
@@ -154,7 +174,6 @@ with tab3:
 
 # --- ЛОГІКА ОНОВЛЕННЯ ДАНИХ ---
 
-# Ініціалізація історії цін у сесії
 if 'current_symbol' not in st.session_state or st.session_state.current_symbol != symbol:
     st.session_state.price_history = []
     st.session_state.time_history = []
@@ -164,6 +183,7 @@ try:
     while True:
         data = get_binance_ticker(symbol)
         bids, asks = get_order_book(symbol)
+        recent_trades = get_recent_trades(symbol)
         
         if data and 'lastPrice' in data:
             current_price = float(data['lastPrice'])
@@ -196,17 +216,20 @@ try:
                 fill='tozeroy'
             ))
             fig.update_layout(height=350, margin=dict(l=0, r=0, t=10, b=10), template="plotly_dark")
-            # Використання динамічного ключа запобігає помилці removeChild
             chart_placeholder.plotly_chart(fig, use_container_width=True, key=f"chart_{symbol}_{time.time()}")
 
-            # 4. Оновлення склянки ордерів з градієнтом
+            # 4. Оновлення склянки ордерів
             if bids is not None and asks is not None:
                 bids_style = bids.style.format(precision=2).background_gradient(cmap='Greens', subset=['Quantity'])
                 asks_style = asks.style.format(precision=2).background_gradient(cmap='Reds', subset=['Quantity'])
                 bids_placeholder.dataframe(bids_style, use_container_width=True, height=250)
                 asks_placeholder.dataframe(asks_style, use_container_width=True, height=250)
 
-            # 5. Оновлення новин
+            # 5. Оновлення останніх угод (Recent Trades)
+            if recent_trades is not None:
+                trades_placeholder.dataframe(recent_trades, use_container_width=True, height=300, hide_index=True)
+
+            # 6. Оновлення новин
             with news_placeholder.container():
                 news_list = get_crypto_news()
                 for item in news_list[:4]:
