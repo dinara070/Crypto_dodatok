@@ -8,70 +8,99 @@ import plotly.graph_objects as go
 # Налаштування сторінки
 st.set_page_config(page_title="Crypto Trading Portal", layout="wide")
 
-# --- ФУНКЦІЇ ДЛЯ ДАНИХ ---
-
+# Використовуємо кешування, щоб не робити зайвих запитів при кожному оновленні інтерфейсу
+@st.cache_data(ttl=60)
 def get_crypto_news():
-    """Отримання свіжих новин криптовалют"""
     url = "https://min-api.cryptocompare.com/data/v2/news/?lang=EN"
     try:
         response = requests.get(url, timeout=5)
         return response.json().get("Data", [])[:5]
-    except:
+    except Exception:
         return []
 
 def get_binance_ticker(symbol="BTCUSDT"):
-    """Отримання поточної ціни та статистики через REST API (для стабільності)"""
     url = f"https://api.binance.com/api/v3/ticker/24hr?symbol={symbol}"
     try:
-        return requests.get(url).json()
-    except:
+        response = requests.get(url, timeout=5)
+        return response.json()
+    except Exception:
         return None
 
 # --- ІНТЕРФЕЙС ---
-
 st.title("🚀 Crypto Intelligence & Trading Portal")
 
-# Сайдбар для налаштувань
+# Сайдбар
 symbol = st.sidebar.selectbox("Оберіть торгову пару", ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT"])
-update_speed = st.sidebar.slider("Швидкість оновлення (сек)", 1, 10, 2)
+update_speed = st.sidebar.slider("Швидкість оновлення (сек)", 2, 10, 3) # Мінімум 2 сек для стабільності
 
 col1, col2 = st.columns([3, 1])
 
 with col1:
     st.subheader(f"Графік {symbol}")
-    
-    # Контейнер для "живих" метрик, щоб не було помилок removeChild
+    # Створюємо статичні контейнери ОДИН РАЗ
     metrics_placeholder = st.empty()
-    
-    # Симуляція графіка (використання Plotly для професійного вигляду)
-    # У реальному проекті тут підключається TradingView Lightweight Charts
     chart_placeholder = st.empty()
 
 with col2:
     st.subheader("Останні новини")
-    news = get_crypto_news()
-    for item in news:
-        st.markdown(f"**[{item['title']}]({item['url']})**")
-        st.caption(f"Джерело: {item['source']} | {datetime.fromtimestamp(item['published_on']).strftime('%H:%M')}")
-        st.divider()
+    news_container = st.container()
+    with news_container:
+        news = get_crypto_news()
+        if news:
+            for item in news:
+                st.markdown(f"**[{item['title']}]({item['url']})**")
+                st.caption(f"Джерело: {item['source']} | {datetime.fromtimestamp(item['published_on']).strftime('%H:%M')}")
+                st.divider()
+        else:
+            st.write("Новини тимчасово недоступні")
 
 # --- ЦИКЛ ОНОВЛЕННЯ ДАНИХ ---
+# Список для зберігання історії цін для графіка
+if 'price_history' not in st.session_state:
+    st.session_state.price_history = []
+    st.session_state.time_history = []
 
-while True:
-    data = get_binance_ticker(symbol)
-    
-    if data:
-        # Оновлюємо метрики в окремому контейнері
-        with metrics_placeholder.container():
-            m1, m2, m3 = st.columns(3)
-            m1.metric("Ціна", f"${float(data['lastPrice']):,.2f}", f"{data['priceChangePercent']}%")
-            m2.metric("Макс за 24г", f"${float(data['highPrice']):,.2f}")
-            m3.metric("Мін за 24г", f"${float(data['lowPrice']):,.2f}")
+try:
+    while True:
+        data = get_binance_ticker(symbol)
+        
+        if data and 'lastPrice' in data:
+            current_price = float(data['lastPrice'])
+            current_time = datetime.now()
 
-        # Малюємо простий свічковий графік (приклад)
-        # Для реальної біржі тут краще використовувати st.components.v1.html з TradingView
-        fig = go.Figure(data=[go.Scatter(x=[datetime.now()], y=[float(data['lastPrice'])], mode='lines+markers')])
-        fig.update_layout(height=400, margin=dict(l=0, r=0, t=0, b=0))
-        chart_placeholder.plotly_chart(fig, use_container_width=True)
+            # Оновлюємо історію (зберігаємо останні 20 точок)
+            st.session_state.price_history.append(current_price)
+            st.session_state.time_history.append(current_time)
+            if len(st.session_state.price_history) > 20:
+                st.session_state.price_history.pop(0)
+                st.session_state.time_history.pop(0)
 
-    time.sleep(update_speed)
+            # 1. Оновлюємо метрики
+            with metrics_placeholder.container():
+                m1, m2, m3 = st.columns(3)
+                m1.metric("Ціна", f"${current_price:,.2f}", f"{data['priceChangePercent']}%")
+                m2.metric("Макс 24г", f"${float(data['highPrice']):,.2f}")
+                m3.metric("Мін 24г", f"${float(data['lowPrice']):,.2f}")
+
+            # 2. Оновлюємо графік
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=st.session_state.time_history, 
+                y=st.session_state.price_history,
+                mode='lines+markers',
+                line=dict(color='#00ff00', width=2),
+                fill='tozeroy'
+            ))
+            fig.update_layout(
+                height=400, 
+                margin=dict(l=0, r=0, t=0, b=0),
+                xaxis_title="Час",
+                yaxis_title="Ціна (USDT)"
+            )
+            chart_placeholder.plotly_chart(fig, use_container_width=True, key=f"chart_{symbol}")
+
+        # Пауза
+        time.sleep(update_speed)
+
+except Exception as e:
+    st.error(f"Виникла помилка: {e}. Спробуйте перезавантажити сторінку.")
