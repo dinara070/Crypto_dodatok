@@ -90,7 +90,6 @@ watchlist_placeholder = st.sidebar.empty()
 st.sidebar.divider()
 st.sidebar.subheader("🎨 Налаштування графіку")
 chart_type = st.sidebar.radio("Тип графіка", ["Лінійний", "З областями"])
-show_volume = st.sidebar.toggle("Показувати об'єми торгів", value=True)
 
 st.sidebar.divider()
 st.sidebar.subheader("🚀 Рівень ризику")
@@ -128,10 +127,10 @@ with tab1:
         st.markdown("### ⚡ Швидка торгівля (Simulation)")
         t_col1, t_col2 = st.columns(2)
         with t_col1:
-            st.button(f"КУПИТИ {symbol[:-4]}", use_container_width=True, type="primary")
+            st.button(f"КУПИТИ {symbol[:-4]}", key="btn_buy", use_container_width=True, type="primary")
             st.number_input("Ціна входу", value=0.0, key="buy_price", format="%.4f")
         with t_col2:
-            st.button(f"ПРОДАТИ {symbol[:-4]}", use_container_width=True)
+            st.button(f"ПРОДАТИ {symbol[:-4]}", key="btn_sell", use_container_width=True)
             st.number_input("Кількість", value=0.0, key="trade_qty", format="%.4f")
         
         st.divider()
@@ -147,6 +146,26 @@ with tab1:
     with col_side:
         st.subheader("📰 Новини")
         news_placeholder = st.empty()
+        
+        st.divider()
+        st.subheader("🔗 Ресурси для трейдерів")
+        st.markdown("""
+        **Аналітика та медіа:**
+        * [**CoinTelegraph**](https://cointelegraph.com/) — Провідне крипто-медіа.
+        * [**CoinDesk**](https://www.coindesk.com/) — Новини та дослідження ринку.
+        * [**Decrypt**](https://decrypt.co/) — Свіжі новини про Web3 та DeFi.
+        
+        **Технічні інструменти:**
+        * [**TradingView**](https://www.tradingview.com/) — Найкращі графіки та індикатори.
+        * [**Glassnode**](https://glassnode.com/) — Професійна On-chain аналітика.
+        * [**CryptoPanic**](https://cryptopanic.com/) — Агрегатор новин у реальному часі.
+        
+        **Ринкові дані:**
+        * [**CoinMarketCap**](https://coinmarketcap.com/) — Капіталізація монет.
+        * [**CoinGecko**](https://www.coingecko.com/) — Альтернативний трекер цін.
+        * [**DEXTools**](https://www.dextools.io/) — Аналіз токенів на DEX.
+        """)
+
         st.divider()
         st.subheader("🕒 Останні угоди")
         trades_placeholder = st.empty()
@@ -248,14 +267,14 @@ try:
             fig.update_layout(height=350, margin=dict(l=0, r=0, t=10, b=10), template="plotly_dark")
             chart_placeholder.plotly_chart(fig, use_container_width=True, key=f"chart_{symbol}_{time.time()}")
 
-            # 4. Оновлення склянки ордерів
+            # 4. Оновлення склянки ордерів з градієнтом
             if bids is not None and asks is not None:
                 bids_style = bids.style.format(precision=2).background_gradient(cmap='Greens', subset=['Quantity'])
                 asks_style = asks.style.format(precision=2).background_gradient(cmap='Reds', subset=['Quantity'])
                 bids_placeholder.dataframe(bids_style, use_container_width=True, height=250)
                 asks_placeholder.dataframe(asks_style, use_container_width=True, height=250)
 
-            # 5. Оновлення останніх угод
+            # 5. Оновлення останніх угод (Recent Trades)
             if recent_trades is not None:
                 trades_placeholder.dataframe(recent_trades, use_container_width=True, height=300, hide_index=True)
 
