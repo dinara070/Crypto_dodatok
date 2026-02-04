@@ -22,7 +22,8 @@ def get_crypto_news():
 def get_binance_ticker(symbol="BTCUSDT"):
     url = f"https://api.binance.com/api/v3/ticker/24hr?symbol={symbol}"
     try:
-        return requests.get(url, timeout=5).json()
+        res = requests.get(url, timeout=5)
+        return res.json() if res.status_code == 200 else None
     except Exception:
         return None
 
@@ -50,7 +51,6 @@ st.sidebar.divider()
 st.sidebar.subheader("📊 Статус ринку")
 st.sidebar.info("Fear & Greed Index: 72 (Greed)")
 
-# Додаємо корисні посилання в сайдбар також
 st.sidebar.divider()
 st.sidebar.subheader("🔗 Швидкі посилання")
 st.sidebar.markdown("""
@@ -65,6 +65,7 @@ st.title("🚀 Crypto Intelligence & Trading Portal")
 col_main, col_news = st.columns([3, 1])
 
 with col_main:
+    # Одразу створюємо контейнери, щоб не було пустоти
     metrics_placeholder = st.empty()
     st.markdown("### 📈 Живий графік")
     chart_placeholder = st.empty()
@@ -82,20 +83,15 @@ with col_news:
     st.subheader("📰 Останні новини")
     news_placeholder = st.empty()
     
-    # --- НОВИЙ РОЗДІЛ: ОФІЦІЙНІ КАНАЛИ ---
     st.divider()
     st.subheader("🔗 Офіційні канали")
-    st.info("Слідкуйте за трендами в першоджерелах:")
-    
     st.markdown("""
-    * [**CoinDesk**](https://www.coindesk.com/) — Головні новини криптосвіту.
-    * [**CoinTelegraph**](https://cointelegraph.com/) — Аналітика та звіти.
-    * [**CryptoPanic**](https://cryptopanic.com/) — Агрегатор новин у реальному часі.
-    * [**Glassnode**](https://studio.glassnode.com/) — On-chain аналітика.
-    * [**Binance Twitter**](https://twitter.com/binance) — Офіційні анонси біржі.
+    * [**CoinDesk**](https://www.coindesk.com/) — Новини.
+    * [**CoinTelegraph**](https://cointelegraph.com/) — Аналітика.
+    * [**CryptoPanic**](https://cryptopanic.com/) — Агрегатор.
+    * [**Glassnode**](https://studio.glassnode.com/) — On-chain.
+    * [**Binance Twitter**](https://twitter.com/binance) — Анонси.
     """)
-    
-    st.button("Оновити ресурси", use_container_width=True)
 
 # --- ЛОГІКА ОНОВЛЕННЯ ---
 
@@ -103,6 +99,16 @@ if 'current_symbol' not in st.session_state or st.session_state.current_symbol !
     st.session_state.price_history = []
     st.session_state.time_history = []
     st.session_state.current_symbol = symbol
+
+# ПОПЕРЕДНЄ ЗАВАНТАЖЕННЯ (щоб не було пусто при старті)
+initial_data = get_binance_ticker(symbol)
+if initial_data and 'lastPrice' in initial_data:
+    with metrics_placeholder.container():
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Ціна", f"${float(initial_data['lastPrice']):,.2f}")
+        m2.metric("Об'єм 24г", f"{float(initial_data['volume']):,.0f}")
+        m3.metric("Макс 24г", f"${float(initial_data['highPrice']):,.2f}")
+        m4.metric("Мін 24г", f"${float(initial_data['lowPrice']):,.2f}")
 
 try:
     while True:
@@ -112,10 +118,12 @@ try:
         if data and 'lastPrice' in data:
             current_price = float(data['lastPrice'])
             
-            # Оновлення калькулятора в сайдбарі
+            # Розрахунок калькулятора
             potential_coins = (usd_amount * lever) / current_price
+            st.sidebar.empty() # Очистка попереднього значення в сайдбарі
             st.sidebar.write(f"Орієнтовний об'єм: **{potential_coins:.5f} {symbol[:-4]}**")
 
+            # 1. Оновлення метрик
             with metrics_placeholder.container():
                 m1, m2, m3, m4 = st.columns(4)
                 m1.metric("Ціна", f"${current_price:,.2f}", f"{data['priceChangePercent']}%")
@@ -123,6 +131,7 @@ try:
                 m3.metric("Макс 24г", f"${float(data['highPrice']):,.2f}")
                 m4.metric("Мін 24г", f"${float(data['lowPrice']):,.2f}")
 
+            # 2. Оновлення графіка
             st.session_state.price_history.append(current_price)
             st.session_state.time_history.append(datetime.now())
             if len(st.session_state.price_history) > 30:
@@ -131,21 +140,26 @@ try:
 
             fig = go.Figure()
             fig.add_trace(go.Scatter(x=st.session_state.time_history, y=st.session_state.price_history, 
-                                     mode='lines+markers', line=dict(color='#00FFCC')))
-            fig.update_layout(height=350, margin=dict(l=0, r=0, t=10, b=10), template="plotly_dark")
-            chart_placeholder.plotly_chart(fig, use_container_width=True, key=f"chart_{symbol}")
+                                     mode='lines+markers', line=dict(color='#00FFCC'), fill='tozeroy'))
+            fig.update_layout(height=350, margin=dict(l=0, r=0, t=10, b=10), template="plotly_dark",
+                              xaxis_showgrid=False, yaxis_showgrid=True)
+            chart_placeholder.plotly_chart(fig, use_container_width=True, key=f"chart_{symbol}_{time.time()}")
 
+            # 3. Оновлення Order Book
             if bids is not None and asks is not None:
-                bids_placeholder.dataframe(bids, use_container_width=True, height=250)
-                asks_placeholder.dataframe(asks, use_container_width=True, height=250)
+                bids_placeholder.dataframe(bids.style.format(precision=2).background_gradient(cmap='Greens', subset=['Quantity']), use_container_width=True, height=250)
+                asks_placeholder.dataframe(asks.style.format(precision=2).background_gradient(cmap='Reds', subset=['Quantity']), use_container_width=True, height=250)
 
+            # 4. Оновлення Новин
             with news_placeholder.container():
                 news = get_crypto_news()
-                for item in news[:4]:
-                    # Робимо заголовок посиланням
-                    st.markdown(f"**[{item['title']}]({item['url']})**")
-                    st.caption(f"Джерело: {item['source']} | {datetime.fromtimestamp(item['published_on']).strftime('%H:%M')}")
-                    st.divider()
+                if news:
+                    for item in news[:4]:
+                        st.markdown(f"**[{item['title']}]({item['url']})**")
+                        st.caption(f"Джерело: {item['source']} | {datetime.fromtimestamp(item['published_on']).strftime('%H:%M')}")
+                        st.divider()
+                else:
+                    st.write("Завантаження новин...")
 
         time.sleep(update_speed)
 
