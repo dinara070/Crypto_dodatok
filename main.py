@@ -136,13 +136,12 @@ with tab1:
             st.number_input("Кількість", value=0.0, key="trade_qty", format="%.4f")
         
         st.divider()
-        # НАЗВА РОЗДІЛУ ВИДАЛЕНА
         ob_col1, ob_col2 = st.columns(2)
         with ob_col1:
-            st.caption("Покупці (Bids)")
+            # НАЗВА "Покупці" ВИДАЛЕНА
             bids_placeholder = st.empty()
         with ob_col2:
-            st.caption("Продавці (Asks)")
+            # НАЗВА "Продавці" ВИДАЛЕНА
             asks_placeholder = st.empty()
 
     with col_side:
@@ -169,7 +168,6 @@ with tab1:
         """)
 
         st.divider()
-        # НАЗВА РОЗДІЛУ ВИДАЛЕНА
         trades_placeholder = st.empty()
 
 # Вкладка 2: Технічний аналіз
